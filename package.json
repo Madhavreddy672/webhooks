@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-webhook",
   "version": "1.0.0",
-  "description": "Webhook for WhatsApp Business Platform (per-message pricing)",
+  "description": "WhatsApp Cloud API webhook handler for per-message pricing model",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
