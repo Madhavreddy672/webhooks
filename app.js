@@ -1,25 +1,79 @@
-import express from "express";
+const express = require("express");
+const crypto = require("crypto");
 const app = express();
+
 app.use(express.json());
 
-// verification handshake
+// ✅ Verify webhook (GET)
 app.get("/webhook", (req, res) => {
-  const verify_token = "test123"; // must match what you entered in dashboard
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token && mode === "subscribe" && token === verify_token) {
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
+  if (mode && token) {
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
+      console.log("✅ Webhook verified!");
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
   }
 });
 
-// receive messages / statuses
+// ✅ Handle incoming webhooks (POST)
 app.post("/webhook", (req, res) => {
-  console.log(JSON.stringify(req.body, null, 2));
-  res.sendStatus(200);
+  const body = req.body;
+
+  // Basic validation
+  if (body.object === "whatsapp_business_account") {
+    body.entry.forEach((entry) => {
+      entry.changes.forEach((change) => {
+        const field = change.field;
+        const value = change.value;
+
+        switch (field) {
+          case "messages":
+            handleMessageEvent(value);
+            break;
+          case "message_template_status_update":
+            console.log("📋 Template update:", value);
+            break;
+          case "account_update":
+            if (value.event === "VOLUME_BASED_PRICING_TIER_UPDATE") {
+              console.log("💰 Volume Tier Update:", value.volume_tier_info);
+            }
+            break;
+          default:
+            console.log("ℹ️ Unknown webhook field:", field);
+        }
+      });
+    });
+
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
 });
 
-app.listen(3000, () => console.log("Webhook listening on port 3000"));
+// ✅ Handle message events
+function handleMessageEvent(value) {
+  const messages = value.messages || [];
+  const statuses = value.statuses || [];
+
+  messages.forEach((msg) => {
+    console.log("📩 Message received:", msg);
+  });
+
+  statuses.forEach((status) => {
+    if (status.pricing) {
+      const { pricing_model, type, category, billable } = status.pricing;
+      console.log("💸 Pricing Info:", { pricing_model, type, category, billable });
+    }
+  });
+}
+
+// ✅ Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Webhook listening on port ${PORT}`));
